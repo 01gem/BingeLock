@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Binge Lock</string>
+    <string name="accessibility_description">BingeLock watches for \"Are you still watching?\" prompts in YouTube and dismisses them automatically.</string>
+</resources>
