@@ -2,7 +2,7 @@
 
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:FFB703,100:121212&height=200&section=header&text=BingeLock&fontSize=52&fontColor=FFFFFF&animation=fadeIn&fontAlignY=38&desc=Stay%20watching.%20Skip%20the%20%22Are%20you%20still%20watching%3F%22%20interruptions.&descAlignY=58&descSize=16" width="100%" alt="BingeLock Header"/>
 
-<img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&size=22&pause=1000&color=FFB703&center=true&vCenter=true&width=500&lines=%F0%9F%94%92+Lock+it.;%F0%9F%91%80+Keep+watching.;%F0%9F%AB%B3+Flip+it+down.;%F0%9F%94%8B+Save+your+battery." alt="Typing SVG" />
+<img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&size=22&pause=1000&color=FFB703&center=true&vCenter=true&width=520&lines=%F0%9F%94%92+Lock+it.;%F0%9F%91%80+Keep+watching.;%F0%9F%AB%B3+Flip+it+down.;%F0%9F%94%8B+Protect+your+battery." alt="Typing SVG" />
 
 <br/>
 <br/>
@@ -12,59 +12,38 @@
 <img src="https://img.shields.io/badge/Min%20SDK-30-FFB703?style=for-the-badge&logo=android&logoColor=121212" alt="Min SDK Badge"/>
 <img src="https://img.shields.io/badge/Version-1.0-FFB703?style=for-the-badge&logo=git&logoColor=121212" alt="Version Badge"/>
 
-**A lightweight Android utility that automatically dismisses supported video continuation prompts, keeps the screen awake, and can pause when the phone is face-down.**
+**A focused Android utility for uninterrupted video playback — combining prompt automation, screen-awake behavior, physical pause control, and battery protection.**
 
 </div>
 
 ---
 
-## ✨ Features
+## 🎯 What BingeLock is for
+
+BingeLock is built to reduce interruptions during supported video playback sessions.
+
+Its core purpose is simple:
+
+> **Keep playback moving without requiring repeated “still watching?” confirmation.**
+
+It does this locally on the device through Android's Accessibility framework, foreground-service capabilities, window overlays, sensors, and persistent local preferences.
+
+---
+
+## ✨ What it can offer
 
 | | |
 |---|---|
-| 🔒 **Auto-dismiss** | Detects `Video paused. Continue watching?`, `Are you still watching?`, and `Still there?` in supported accessibility targets and attempts to click the matching control. |
-| 👀 **Keep awake** | Uses a transparent application overlay with `FLAG_KEEP_SCREEN_ON` while BingeLock is active. |
-| 🫳 **Face-down pause** | Detects a sustained face-down position for roughly **10 seconds**, removes the overlay, then restores it when the phone is upright again. |
-| 🔋 **Battery floor** | Automatically disables BingeLock below **15%** battery while unplugged. |
-| ⚡ **Quick Settings** | Toggle BingeLock directly from an Android Quick Settings tile. |
-| 📝 **Dismissal logs** | Successful automatic dismissals are timestamped and stored locally, with the latest **100 entries** retained. |
-| 🌑 **Dark utility UI** | Minimal dark interface with high-contrast status text and a monospace activity log. |
-| 💾 **Local storage** | Preferences and logs are stored with Android `SharedPreferences`. |
+| 🔒 **Automatic prompt handling** | Detects supported continuation prompts and attempts to activate the matching clickable control automatically. |
+| 👀 **Screen-awake behavior** | Maintains a transparent overlay configured to keep the screen on while BingeLock is active. |
+| 🫳 **Physical pause control** | A sustained face-down position pauses the overlay; returning upright restores it. |
+| 🔋 **Battery protection** | Drops into an automatic shutdown state below **15%** battery when the device is unplugged. |
+| ⚡ **Quick access** | Provides a dedicated Android Quick Settings tile for fast enable/disable control. |
+| 📝 **Activity history** | Records successful automatic dismissals with timestamps and retains the latest **100 entries**. |
+| 🔔 **Status feedback** | Uses an ongoing foreground notification plus dismissal alerts to expose current activity. |
+| 💾 **Local operation** | Stores preferences and logs locally with Android `SharedPreferences`. |
 
-<div align="center">
-<img src="https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif" width="220" alt="Watching animation"/>
-</div>
-
----
-
-## 🛠 Tech Stack
-
-- **Language:** Kotlin
-- **Platform:** Android
-- **Compile / Target SDK:** 34
-- **Min SDK:** 30
-- **UI:** XML + AndroidX AppCompat
-- **Background:** Foreground Service
-- **Automation:** Accessibility Service
-- **Sensors:** Accelerometer
-- **Overlay:** `WindowManager`
-- **Persistence:** `SharedPreferences`
-- **Quick toggle:** Android `TileService`
-
----
-
-## 📂 Project structure
-
-```text
-app/src/main/java/com/gem/bingelock/
-├── MainActivity.kt                    # Main UI + master switch + history
-├── BingeService.kt                    # Foreground service, overlay, battery + sensor logic
-├── BingeAccessibilityService.kt       # Prompt detection + auto-click handling
-├── BingeTileService.kt                # Quick Settings tile
-└── PrefsHelper.kt                     # SharedPreferences wrapper
-```
-
-### Supported targets
+### Supported playback targets
 
 ```text
 com.google.android.youtube
@@ -73,16 +52,73 @@ app.morphe.android.youtube
 
 ---
 
-## 🚀 Getting started
+## 🧩 What it's made of
 
-### Requirements
+BingeLock is intentionally built from native Android components rather than external services.
 
-- Android Studio
-- Android SDK 34
-- Android 11+ device/emulator
-- Accelerometer for face-down detection
+| Component | Role |
+|---|---|
+| **Kotlin** | Application language |
+| **Android SDK 34** | Compile + target platform |
+| **Android SDK 30+** | Minimum supported platform |
+| **Accessibility Service** | Detects supported playback prompts and interacts with their UI |
+| **Foreground Service** | Keeps the core runtime active |
+| **WindowManager Overlay** | Provides the transparent screen-awake layer |
+| **Accelerometer** | Detects sustained face-down orientation |
+| **SharedPreferences** | Stores app state and dismissal history |
+| **Quick Settings Tile** | Provides a system-level toggle |
+| **AndroidX AppCompat / Core KTX** | Application support libraries |
 
-### Build
+---
+
+## ⚙️ What it can ensure
+
+Within the behavior implemented by the current source:
+
+```text
+Supported prompt detected
+        │
+        ▼
+Accessibility tree searched
+        │
+        ▼
+Clickable target located
+        │
+        ▼
+Automatic click attempted
+        │
+        ├── Success → log + notification
+        └── Failure → no forced action
+```
+
+And while active:
+
+```text
+BingeLock
+   ├── Keeps the screen awake
+   ├── Watches battery level
+   ├── Watches device orientation
+   └── Maintains visible service status
+```
+
+The implementation is defensive: it checks the target package, searches for known prompt text, walks up to two parent levels for a clickable target, and logs the result.
+
+---
+
+## 📂 Project structure
+
+```text
+app/src/main/java/com/gem/bingelock/
+├── MainActivity.kt
+├── BingeService.kt
+├── BingeAccessibilityService.kt
+├── BingeTileService.kt
+└── PrefsHelper.kt
+```
+
+---
+
+## 🚀 Build
 
 ```bash
 ./gradlew assembleDebug
@@ -94,43 +130,7 @@ Install on a connected device:
 ./gradlew installDebug
 ```
 
-### First-run setup
-
-1. Open **BingeLock**
-2. Enable the master switch
-3. Grant **Display over other apps** permission
-4. Enable the **BingeLock Accessibility Service**
-5. Add the Quick Settings tile, if desired
-
-> BingeLock relies on Android's Accessibility framework for automatic prompt detection and interaction.
-
----
-
-## ⚙️ How it works
-
-```text
-BingeLock ON
-    │
-    ├── Foreground Service
-    │      ├── Transparent overlay → keep screen awake
-    │      ├── Battery monitor     → stop below 15% unplugged
-    │      └── Accelerometer       → face-down pause/resume
-    │
-    └── Accessibility Service
-           ├── Watch supported packages
-           ├── Find known prompt text
-           ├── Click matching node
-           ├── Save timestamped log
-           └── Send dismissal notification
-```
-
----
-
-## ⚠️ Notes
-
-BingeLock depends on the accessibility hierarchy and visible prompt text exposed by the target app. Changes to YouTube or other supported apps may therefore affect automatic dismissal.
-
-The current UI includes a **“Settings (coming soon)”** button; the underlying implementation already stores settings such as the battery floor and target packages, but the full settings editor is not currently exposed in the UI.
+For the installable APK, see the repository's **Releases** section.
 
 ---
 
@@ -139,7 +139,5 @@ The current UI includes a **“Settings (coming soon)”** button; the underlyin
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:121212,100:FFB703&height=120&section=footer" width="100%" alt="Footer animation"/>
 
 **Less interruption. More watching.**
-
-Made with ☕ and a stubborn dislike of unnecessary prompts.
 
 </div>
