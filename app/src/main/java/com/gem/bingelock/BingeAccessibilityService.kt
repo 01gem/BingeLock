@@ -18,10 +18,27 @@ class BingeAccessibilityService : AccessibilityService() {
         "com.google.android.youtube",
         "app.morphe.android.youtube"
     )
-    private val promptStrings = listOf(
+
+    // The phrases that indicate a "Still Watching" dialog is visible
+    private val promptPhrases = listOf(
         "Video paused. Continue watching?",
         "Are you still watching?",
-        "Still there?"
+        "Still there?",
+        "Video paused",
+        "Video Paused",
+        "Still watching? Video will pause soon.",
+        "Are you still there?",
+        "Click to resume playback.",
+        "Paused due to inactivity.",
+        "Resume video?"
+    )
+
+    // The specific button labels to click once a prompt is detected
+    private val actionButtons = listOf(
+        "Yes",
+        "Continue",
+        "Continue watching",
+        "CONTINUE"
     )
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -29,52 +46,98 @@ class BingeAccessibilityService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg !in targetPackages) return
 
-        Log.d(TAG, "EVENT from $pkg type=${event.eventType} class=${event.className}")
-
-        val root = rootInActiveWindow ?: run {
-            Log.d(TAG, "  rootInActiveWindow was null")
-            return
-        }
+        val root = rootInActiveWindow ?: return
 
         try {
-            // Disabled log flooding tree walk to optimize performance on 2GB RAM
-            // dumpNodeTree(root, 0)
+            // Check if ANY of our trigger phrases are visible on the screen right now
+            var promptDetected = false
+            var detectedText = ""
+            
+            for (phrase in promptPhrases) {
+                val nodes = root.findAccessibilityNodeInfosByText(phrase)
+                if (!nodes.isNullOrEmpty()) {
+                    promptDetected = true
+                    detectedText = phrase
+                    // Clean up nodes
+                    for (n in nodes) n?.recycle()
+                    break
+                }
+            }
 
-            for (text in promptStrings) {
-                val nodes = root.findAccessibilityNodeInfosByText(text) ?: continue
-                if (nodes.isEmpty()) continue
+            if (promptDetected) {
+                Log.d(TAG, "Prompt detected: \"$detectedText\". Searching for action button...")
 
-                Log.d(TAG, "  MATCH for \"$text\" — ${nodes.size} node(s)")
-                for (node in nodes) {
-                    if (node == null) continue
-                    Log.d(TAG, "    node text=${node.text} clickable=${node.isClickable} class=${node.className}")
-
-                    val target = when {
-                        node.isClickable -> node
-                        node.parent?.isClickable == true -> node.parent
-                        node.parent?.parent?.isClickable == true -> node.parent.parent
-                        else -> null
-                    }
-
-                    if (target != null) {
-                        val ok = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        Log.d(TAG, "    CLICK result=$ok")
-                        if (ok) {
-                            val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-                            saveLogToPrefs("[$ts] Auto-dismissed \"$text\" on $pkg")
-                            sendDismissalNotification(text, pkg)
+                // 1. First attempt: Look for specific clickable buttons (Yes/Continue)
+                for (btnLabel in actionButtons) {
+                    val btnNodes = root.findAccessibilityNodeInfosByText(btnLabel)
+                    if (!btnNodes.isNullOrEmpty()) {
+                        for (node in btnNodes) {
+                            if (node == null) continue
+                            val target = findClickableTarget(node)
+                            if (target != null) {
+                                val ok = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                                Log.d(TAG, "Clicked button \"$btnLabel\" - Success: $ok")
+                                if (ok) {
+                                    handleSuccess(btnLabel, pkg)
+                                    // Cleanup all nodes before returning
+                                    if (target != node) target.recycle()
+                                    for (n in btnNodes) n?.recycle()
+                                    return
+                                }
+                                if (target != node) target.recycle()
+                            }
+                            node.recycle()
                         }
-                    } else {
-                        Log.d(TAG, "    no clickable target found in 3 levels")
                     }
                 }
-                for (n in nodes) n?.recycle()
+
+                // 2. Fallback: If no "Yes" button found, try clicking the prompt text area itself
+                val promptNodes = root.findAccessibilityNodeInfosByText(detectedText)
+                if (!promptNodes.isNullOrEmpty()) {
+                    for (node in promptNodes) {
+                        if (node == null) continue
+                        val target = findClickableTarget(node)
+                        if (target != null) {
+                            val ok = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                            Log.d(TAG, "Clicked prompt layout fallback - Success: $ok")
+                            if (ok) {
+                                handleSuccess(detectedText, pkg)
+                                if (target != node) target.recycle()
+                                for (n in promptNodes) n?.recycle()
+                                return
+                            }
+                            if (target != node) target.recycle()
+                        }
+                        node.recycle()
+                    }
+                }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error processing event", e)
+            Log.e(TAG, "Error processing accessibility event", e)
         } finally {
             root.recycle()
         }
+    }
+
+    private fun findClickableTarget(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        if (node.isClickable) return node
+        val parent = node.parent
+        if (parent != null) {
+            if (parent.isClickable) return parent
+            val grandParent = parent.parent
+            if (grandParent != null && grandParent.isClickable) {
+                parent.recycle()
+                return grandParent
+            }
+            parent.recycle()
+        }
+        return null
+    }
+
+    private fun handleSuccess(text: String, pkg: String) {
+        val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        saveLogToPrefs("[$ts] Auto-dismissed \"$text\" on $pkg")
+        sendDismissalNotification(text, pkg)
     }
 
     private fun dumpNodeTree(node: AccessibilityNodeInfo, depth: Int) {
