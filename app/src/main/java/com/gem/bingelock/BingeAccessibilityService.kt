@@ -2,18 +2,23 @@ package com.gem.bingelock
 
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
+import android.content.Context
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import android.content.Context
 import androidx.core.app.NotificationCompat
+import androidx.core.content.edit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@Suppress("AccessibilityService")
 class BingeAccessibilityService : AccessibilityService() {
 
-    private val TAG = "BingeLock"
+    companion object {
+        private const val TAG = "BingeLock"
+    }
+
     private val targetPackages = setOf(
         "com.google.android.youtube",
         "app.morphe.android.youtube"
@@ -58,8 +63,6 @@ class BingeAccessibilityService : AccessibilityService() {
                 if (!nodes.isNullOrEmpty()) {
                     promptDetected = true
                     detectedText = phrase
-                    // Clean up nodes
-                    for (n in nodes) n?.recycle()
                     break
                 }
             }
@@ -79,14 +82,9 @@ class BingeAccessibilityService : AccessibilityService() {
                                 Log.d(TAG, "Clicked button \"$btnLabel\" - Success: $ok")
                                 if (ok) {
                                     handleSuccess(btnLabel, pkg)
-                                    // Cleanup all nodes before returning
-                                    if (target != node) target.recycle()
-                                    for (n in btnNodes) n?.recycle()
                                     return
                                 }
-                                if (target != node) target.recycle()
                             }
-                            node.recycle()
                         }
                     }
                 }
@@ -102,20 +100,14 @@ class BingeAccessibilityService : AccessibilityService() {
                             Log.d(TAG, "Clicked prompt layout fallback - Success: $ok")
                             if (ok) {
                                 handleSuccess(detectedText, pkg)
-                                if (target != node) target.recycle()
-                                for (n in promptNodes) n?.recycle()
                                 return
                             }
-                            if (target != node) target.recycle()
                         }
-                        node.recycle()
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing accessibility event", e)
-        } finally {
-            root.recycle()
         }
     }
 
@@ -126,10 +118,8 @@ class BingeAccessibilityService : AccessibilityService() {
             if (parent.isClickable) return parent
             val grandParent = parent.parent
             if (grandParent != null && grandParent.isClickable) {
-                parent.recycle()
                 return grandParent
             }
-            parent.recycle()
         }
         return null
     }
@@ -151,7 +141,6 @@ class BingeAccessibilityService : AccessibilityService() {
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
             dumpNodeTree(child, depth + 1)
-            child.recycle()
         }
     }
 
@@ -161,10 +150,12 @@ class BingeAccessibilityService : AccessibilityService() {
 
     private fun saveLogToPrefs(message: String) {
         try {
-            val prefs = getSharedPreferences("bingelock", Context.MODE_PRIVATE)
+            val prefs = getSharedPreferences("bingelock", MODE_PRIVATE)
             val currentLogs = prefs.getString("savedLogs", "") ?: ""
             val lines = (message + "\n" + currentLogs).lines().take(100)
-            prefs.edit().putString("savedLogs", lines.joinToString("\n")).apply()
+            prefs.edit {
+                putString("savedLogs", lines.joinToString("\n"))
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error saving history log to SharedPreferences", e)
         }
