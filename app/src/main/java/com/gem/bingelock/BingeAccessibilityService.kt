@@ -125,7 +125,7 @@ class BingeAccessibilityService : AccessibilityService() {
     }
 
     private fun handleSuccess(text: String, pkg: String) {
-        val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+        val ts = SimpleDateFormat("yyyy-MM-dd hh:mm:ss a", Locale.getDefault()).format(Date())
         saveLogToPrefs("[$ts] Auto-dismissed \"$text\" on $pkg")
         sendDismissalNotification(text, pkg)
     }

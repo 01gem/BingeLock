@@ -18,6 +18,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var btnSettings: Button
     private lateinit var historyLogText: TextView
+    private lateinit var btnClearLogs: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,11 +30,18 @@ class MainActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
         btnSettings = findViewById(R.id.btnSettings)
         historyLogText = findViewById(R.id.historyLogText)
+        btnClearLogs = findViewById(R.id.btnClearLogs)
 
         // Display current logs if they exist
         val logs = prefsHelper.savedLogs
         if (logs.isNotEmpty()) {
             historyLogText.text = logs
+        }
+
+        btnClearLogs.setOnClickListener {
+            Log.d("BingeLock", "Clear logs button clicked")
+            prefsHelper.savedLogs = ""
+            historyLogText.text = "No dismissal actions executed yet."
         }
 
         // Read PrefsHelper to set the initial state of the master Switch
@@ -87,6 +95,8 @@ class MainActivity : AppCompatActivity() {
         val logs = prefsHelper.savedLogs
         if (logs.isNotEmpty()) {
             historyLogText.text = logs
+        } else {
+            historyLogText.text = "No dismissal actions executed yet."
         }
     }
 }
