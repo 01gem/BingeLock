@@ -77,6 +77,7 @@ class MainActivity : AppCompatActivity() {
 
         btnSettings.setOnClickListener {
             Log.d("BingeLock", "Settings button clicked")
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
 

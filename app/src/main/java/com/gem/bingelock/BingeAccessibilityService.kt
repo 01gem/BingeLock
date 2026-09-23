@@ -3,7 +3,9 @@ package com.gem.bingelock
 import android.accessibilityservice.AccessibilityService
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import androidx.core.app.NotificationCompat
@@ -19,37 +21,53 @@ class BingeAccessibilityService : AccessibilityService() {
         private const val TAG = "BingeLock"
     }
 
-    private val targetPackages = setOf(
-        "com.google.android.youtube",
-        "app.morphe.android.youtube"
-    )
+    private var prefsHelper: PrefsHelper? = null
+    private var lastDismissTime: Long = 0L
+    private val DISMISS_DEBOUNCE_MS = 2000L
 
-    // The phrases that indicate a "Still Watching" dialog is visible
-    private val promptPhrases = listOf(
-        "Video paused. Continue watching?",
-        "Are you still watching?",
-        "Still there?",
-        "Video paused",
-        "Video Paused",
-        "Still watching? Video will pause soon.",
-        "Are you still there?",
-        "Click to resume playback.",
-        "Paused due to inactivity.",
-        "Resume video?"
-    )
+    override fun onCreate() {
+        super.onCreate()
+        prefsHelper = PrefsHelper(this)
+    }
 
-    // The specific button labels to click once a prompt is detected
-    private val actionButtons = listOf(
-        "Yes",
-        "Continue",
-        "Continue watching",
-        "CONTINUE"
-    )
+    private fun getTargetPackages(): Set<String> {
+        val helper = prefsHelper ?: PrefsHelper(this).also { prefsHelper = it }
+        return helper.targetPackages
+    }
+
+    private fun getPromptPhrases(): List<String> {
+        val helper = prefsHelper ?: PrefsHelper(this).also { prefsHelper = it }
+        return helper.promptPhrases
+            .split("\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    private fun getActionButtons(): List<String> {
+        val helper = prefsHelper ?: PrefsHelper(this).also { prefsHelper = it }
+        return helper.actionButtons
+            .split("\n")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+    }
+
+    private fun dispatchMediaPlay() {
+        try {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            val down = KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PLAY)
+            val up = KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PLAY)
+            am.dispatchMediaKeyEvent(down)
+            am.dispatchMediaKeyEvent(up)
+            Log.d(TAG, "Dispatched KEYCODE_MEDIA_PLAY")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to dispatch media key", e)
+        }
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg !in targetPackages) return
+        if (pkg !in getTargetPackages()) return
 
         val root = rootInActiveWindow ?: return
 
@@ -58,7 +76,7 @@ class BingeAccessibilityService : AccessibilityService() {
             var promptDetected = false
             var detectedText = ""
             
-            for (phrase in promptPhrases) {
+            for (phrase in getPromptPhrases()) {
                 val nodes = root.findAccessibilityNodeInfosByText(phrase)
                 if (!nodes.isNullOrEmpty()) {
                     promptDetected = true
@@ -71,7 +89,7 @@ class BingeAccessibilityService : AccessibilityService() {
                 Log.d(TAG, "Prompt detected: \"$detectedText\". Searching for action button...")
 
                 // 1. First attempt: Look for specific clickable buttons (Yes/Continue)
-                for (btnLabel in actionButtons) {
+                for (btnLabel in getActionButtons()) {
                     val btnNodes = root.findAccessibilityNodeInfosByText(btnLabel)
                     if (!btnNodes.isNullOrEmpty()) {
                         for (node in btnNodes) {
@@ -80,6 +98,13 @@ class BingeAccessibilityService : AccessibilityService() {
                             if (target != null) {
                                 val ok = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                                 Log.d(TAG, "Clicked button \"$btnLabel\" - Success: $ok")
+
+                                // Safety net: always send a media-play key
+                                if (System.currentTimeMillis() - lastDismissTime > DISMISS_DEBOUNCE_MS) {
+                                    lastDismissTime = System.currentTimeMillis()
+                                    dispatchMediaPlay()
+                                }
+
                                 if (ok) {
                                     handleSuccess(btnLabel, pkg)
                                     return
@@ -98,6 +123,13 @@ class BingeAccessibilityService : AccessibilityService() {
                         if (target != null) {
                             val ok = target.performAction(AccessibilityNodeInfo.ACTION_CLICK)
                             Log.d(TAG, "Clicked prompt layout fallback - Success: $ok")
+
+                            // Safety net
+                            if (System.currentTimeMillis() - lastDismissTime > DISMISS_DEBOUNCE_MS) {
+                                lastDismissTime = System.currentTimeMillis()
+                                dispatchMediaPlay()
+                            }
+
                             if (ok) {
                                 handleSuccess(detectedText, pkg)
                                 return
@@ -128,20 +160,6 @@ class BingeAccessibilityService : AccessibilityService() {
         val ts = SimpleDateFormat("yyyy-MM-dd hh:mm:ss a", Locale.getDefault()).format(Date())
         saveLogToPrefs("[$ts] Auto-dismissed \"$text\" on $pkg")
         sendDismissalNotification(text, pkg)
-    }
-
-    private fun dumpNodeTree(node: AccessibilityNodeInfo, depth: Int) {
-        if (depth > 8) return
-        val indent = "  ".repeat(depth)
-        val text = node.text?.toString() ?: ""
-        val desc = node.contentDescription?.toString() ?: ""
-        if (text.isNotEmpty() || desc.isNotEmpty()) {
-            Log.d(TAG, "$indent[${node.className}] text=\"$text\" desc=\"$desc\" clickable=${node.isClickable}")
-        }
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i) ?: continue
-            dumpNodeTree(child, depth + 1)
-        }
     }
 
     override fun onInterrupt() {
